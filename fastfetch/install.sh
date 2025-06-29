@@ -30,6 +30,27 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Function to check if running as root and set sudo usage
+check_root_and_sudo() {
+    if [[ $EUID -eq 0 ]]; then
+        print_warning "Running as root user detected."
+        print_status "The script will run directly without sudo commands."
+        USE_SUDO=""
+    else
+        print_status "Running as regular user."
+        # Check if sudo is available
+        if ! command -v sudo >/dev/null 2>&1; then
+            print_error "sudo is required but not installed. Please install sudo first or run as root."
+            exit 1
+        fi
+        
+        if ! sudo -n true 2>/dev/null; then
+            print_warning "You will need to enter your password for sudo commands."
+        fi
+        USE_SUDO="sudo"
+    fi
+}
+
 # Main script execution
 main() {
     echo "=========================================="
@@ -48,41 +69,61 @@ main() {
     print_warning "Please ensure you have sudo privileges to run this script."
     echo
     
-    # Update and upgrade system
-    print_status "Updating and upgrading system packages..."
-    if sudo apt update && sudo apt upgrade -y; then
-        print_success "System updated and upgraded successfully."
+    # Check root/sudo status
+    check_root_and_sudo
+    echo
+    
+    # Update system
+    print_status "Updating system packages..."
+    if $USE_SUDO apt update; then
+        print_success "System packages updated successfully."
     else
-        print_error "Failed to update and upgrade system packages."
+        print_error "Failed to update system packages."
         exit 1
     fi
     
-    # Add FastFetch PPA
-    print_status "Adding FastFetch PPA repository..."
-    if sudo add-apt-repository ppa:fastfetch/stable -y; then
-        print_success "FastFetch PPA added successfully."
+    # Install dependencies
+    print_status "Installing build dependencies..."
+    if $USE_SUDO apt install git cmake gcc libpci-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev -y; then
+        print_success "Build dependencies installed successfully."
     else
-        print_error "Failed to add FastFetch PPA."
+        print_error "Failed to install build dependencies."
         exit 1
     fi
     
-    # Update package list
-    print_status "Updating package list..."
-    if sudo apt update; then
-        print_success "Package list updated successfully."
+    # Clone FastFetch repository
+    print_status "Cloning FastFetch repository..."
+    if git clone https://github.com/fastfetch-cli/fastfetch.git; then
+        print_success "FastFetch repository cloned successfully."
     else
-        print_error "Failed to update package list."
+        print_error "Failed to clone FastFetch repository."
+        exit 1
+    fi
+    
+    # Build FastFetch
+    print_status "Building FastFetch from source..."
+    cd fastfetch
+    if mkdir build && cd build && cmake .. && make -j$(nproc); then
+        print_success "FastFetch built successfully."
+    else
+        print_error "Failed to build FastFetch."
         exit 1
     fi
     
     # Install FastFetch
     print_status "Installing FastFetch..."
-    if sudo apt install fastfetch -y; then
+    if $USE_SUDO make install; then
         print_success "FastFetch installed successfully!"
     else
         print_error "Failed to install FastFetch."
         exit 1
     fi
+    
+    # Cleanup
+    print_status "Cleaning up build files..."
+    cd ../..
+    rm -rf fastfetch
+    print_success "Cleanup completed."
     
     echo
     print_success "FastFetch installation completed successfully!"

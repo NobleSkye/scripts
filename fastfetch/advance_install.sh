@@ -267,7 +267,7 @@ install_fastfetch() {
                 echo
                 if [[ ! $REPLY =~ ^[Nn]$ ]]; then
                     print_status "Updating system packages..."
-                    if $USE_SUDO apt update && $USE_SUDO apt upgrade -y; then
+                    if $USE_SUDO apt update; then
                         print_success "System updated successfully."
                     else
                         print_warning "System update failed, but continuing with FastFetch installation..."
@@ -282,32 +282,134 @@ install_fastfetch() {
             
             echo
             
-            # Add FastFetch PPA
-            print_status "Adding FastFetch PPA repository..."
-            if $USE_SUDO add-apt-repository ppa:fastfetch/stable -y; then
-                print_success "FastFetch PPA added successfully."
+            # Install build dependencies
+            print_status "Installing build dependencies..."
+            if $USE_SUDO apt install git cmake gcc libpci-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev -y; then
+                print_success "Build dependencies installed successfully."
             else
-                print_error "Failed to add FastFetch PPA."
+                print_error "Failed to install build dependencies."
                 exit 1
             fi
             
-            # Update package list
-            print_status "Updating package list..."
-            if $USE_SUDO apt update; then
-                print_success "Package list updated successfully."
+            # Clone FastFetch repository
+            print_status "Cloning FastFetch repository..."
+            if git clone https://github.com/fastfetch-cli/fastfetch.git; then
+                print_success "FastFetch repository cloned successfully."
             else
-                print_error "Failed to update package list."
+                print_error "Failed to clone FastFetch repository."
+                exit 1
+            fi
+            
+            # Build FastFetch
+            print_status "Building FastFetch from source..."
+            cd fastfetch
+            if mkdir build && cd build && cmake .. && make -j$(nproc); then
+                print_success "FastFetch built successfully."
+            else
+                print_error "Failed to build FastFetch."
                 exit 1
             fi
             
             # Install FastFetch
             print_status "Installing FastFetch..."
-            if $USE_SUDO apt install fastfetch -y; then
+            if $USE_SUDO make install; then
                 print_success "FastFetch installed successfully!"
             else
                 print_error "Failed to install FastFetch."
                 exit 1
             fi
+            
+            # Cleanup
+            print_status "Cleaning up build files..."
+            cd ../..
+            rm -rf fastfetch
+            print_success "Cleanup completed."
+            ;;
+        dnf)
+            print_warning "Red Hat-based systems detected. Installing dependencies and building from source..."
+            
+            # Install dependencies for Red Hat systems
+            print_status "Installing build dependencies..."
+            if $USE_SUDO dnf install git cmake gcc pciutils-devel wayland-devel libX11-devel libXrandr-devel libXi-devel mesa-libGL-devel -y; then
+                print_success "Build dependencies installed successfully."
+            else
+                print_error "Failed to install build dependencies."
+                exit 1
+            fi
+            
+            # Build from source (same as apt)
+            print_status "Cloning FastFetch repository..."
+            if git clone https://github.com/fastfetch-cli/fastfetch.git; then
+                print_success "FastFetch repository cloned successfully."
+            else
+                print_error "Failed to clone FastFetch repository."
+                exit 1
+            fi
+            
+            print_status "Building FastFetch from source..."
+            cd fastfetch
+            if mkdir build && cd build && cmake .. && make -j$(nproc); then
+                print_success "FastFetch built successfully."
+            else
+                print_error "Failed to build FastFetch."
+                exit 1
+            fi
+            
+            print_status "Installing FastFetch..."
+            if $USE_SUDO make install; then
+                print_success "FastFetch installed successfully!"
+            else
+                print_error "Failed to install FastFetch."
+                exit 1
+            fi
+            
+            print_status "Cleaning up build files..."
+            cd ../..
+            rm -rf fastfetch
+            print_success "Cleanup completed."
+            ;;
+        pacman)
+            print_warning "Arch-based systems detected. Installing dependencies and building from source..."
+            
+            # Install dependencies for Arch systems
+            print_status "Installing build dependencies..."
+            if $USE_SUDO pacman -S git cmake gcc pciutils wayland libx11 libxrandr libxi mesa --noconfirm; then
+                print_success "Build dependencies installed successfully."
+            else
+                print_error "Failed to install build dependencies."
+                exit 1
+            fi
+            
+            # Build from source (same as others)
+            print_status "Cloning FastFetch repository..."
+            if git clone https://github.com/fastfetch-cli/fastfetch.git; then
+                print_success "FastFetch repository cloned successfully."
+            else
+                print_error "Failed to clone FastFetch repository."
+                exit 1
+            fi
+            
+            print_status "Building FastFetch from source..."
+            cd fastfetch
+            if mkdir build && cd build && cmake .. && make -j$(nproc); then
+                print_success "FastFetch built successfully."
+            else
+                print_error "Failed to build FastFetch."
+                exit 1
+            fi
+            
+            print_status "Installing FastFetch..."
+            if $USE_SUDO make install; then
+                print_success "FastFetch installed successfully!"
+            else
+                print_error "Failed to install FastFetch."
+                exit 1
+            fi
+            
+            print_status "Cleaning up build files..."
+            cd ../..
+            rm -rf fastfetch
+            print_success "Cleanup completed."
             ;;
         *)
             print_error "Automatic installation not supported for this distribution."
