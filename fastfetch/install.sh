@@ -140,6 +140,90 @@ verify_installation() {
     fi
 }
 
+# Function to handle neofetch options
+handle_neofetch_options() {
+    echo
+    print_status "Neofetch Configuration Options:"
+    echo
+    
+    # Check if neofetch is installed
+    if command_exists neofetch; then
+        print_warning "Neofetch is currently installed on your system."
+        echo
+        read -p "Do you want to remove neofetch? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            print_status "Removing neofetch..."
+            if sudo apt remove neofetch -y && sudo apt autoremove -y; then
+                print_success "Neofetch removed successfully!"
+            else
+                print_warning "Failed to remove neofetch, but continuing with FastFetch installation."
+            fi
+        else
+            print_status "Keeping neofetch installed."
+        fi
+    else
+        print_status "Neofetch is not currently installed."
+    fi
+    
+    echo
+    read -p "Do you want to create an alias so 'neofetch' command runs FastFetch? (Y/n): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+        create_neofetch_alias
+    else
+        print_status "Skipping neofetch alias creation."
+    fi
+}
+
+# Function to create neofetch alias
+create_neofetch_alias() {
+    print_status "Creating neofetch alias for FastFetch..."
+    
+    # Determine shell configuration file
+    local shell_config=""
+    if [[ -n "$ZSH_VERSION" ]] || [[ "$SHELL" == *"zsh"* ]]; then
+        shell_config="$HOME/.zshrc"
+    elif [[ -n "$BASH_VERSION" ]] || [[ "$SHELL" == *"bash"* ]]; then
+        shell_config="$HOME/.bashrc"
+    else
+        shell_config="$HOME/.bashrc"  # Default fallback
+    fi
+    
+    # Check if alias already exists
+    if grep -q "alias neofetch=" "$shell_config" 2>/dev/null; then
+        print_warning "Neofetch alias already exists in $shell_config"
+        read -p "Do you want to update it? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            # Remove existing alias and add new one
+            sed -i '/alias neofetch=/d' "$shell_config"
+            echo "alias neofetch='fastfetch'" >> "$shell_config"
+            print_success "Neofetch alias updated in $shell_config"
+        else
+            print_status "Keeping existing neofetch alias."
+            return
+        fi
+    else
+        # Add new alias
+        echo "alias neofetch='fastfetch'" >> "$shell_config"
+        print_success "Neofetch alias added to $shell_config"
+    fi
+    
+    # Also create a symbolic link for system-wide access (optional)
+    read -p "Do you want to create a system-wide neofetch command? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        if sudo ln -sf "$(which fastfetch)" /usr/local/bin/neofetch 2>/dev/null; then
+            print_success "System-wide neofetch command created!"
+        else
+            print_warning "Failed to create system-wide neofetch command, but shell alias was created."
+        fi
+    fi
+    
+    print_status "You may need to restart your terminal or run 'source $shell_config' for the alias to take effect."
+}
+
 # Main script execution
 main() {
     echo "=========================================="
@@ -156,16 +240,25 @@ main() {
     
     # Countdown timer for disclaimer acknowledgment
     echo "Press Ctrl+C to stop this script, Enter to continue immediately, or wait 10 seconds to proceed..."
+    echo -n "Continuing in "
+    
     for i in {10..1}; do
-        echo -ne "\rContinuing in ${i} seconds... (Press Enter to skip countdown)"
-        read -t 1 -n 1 key
-        if [[ $key == "" ]]; then
-            echo -e "\nProceeding with installation..."
-            break
+        echo -n "${i}... "
+        
+        # Check if Enter was pressed
+        if read -t 1 -n 1 -s key; then
+            if [[ -z "$key" ]] || [[ "$key" == $'\n' ]] || [[ "$key" == $'\r' ]]; then
+                echo
+                echo "Proceeding with installation..."
+                break
+            fi
         fi
     done
+    
+    # If countdown completed without interruption
     if [[ $i -eq 0 ]]; then
-        echo -e "\nProceeding with installation..."
+        echo
+        echo "Proceeding with installation..."
     fi
     echo
     print_status "This script will install FastFetch on your system."
@@ -193,8 +286,14 @@ main() {
     # Install FastFetch
     install_fastfetch
     
+    # Handle neofetch options
+    handle_neofetch_options
+    
     # Verify installation
     verify_installation
+    
+    # Handle neofetch options
+    handle_neofetch_options
     
     echo
     print_success "FastFetch installation completed successfully!"
