@@ -93,6 +93,13 @@ main() {
     
     # Clone FastFetch repository
     print_status "Cloning FastFetch repository..."
+    
+    # Remove existing directory if it exists
+    if [[ -d "fastfetch" ]]; then
+        print_warning "Existing FastFetch directory found. Removing it..."
+        rm -rf fastfetch
+    fi
+    
     if git clone https://github.com/fastfetch-cli/fastfetch.git; then
         print_success "FastFetch repository cloned successfully."
     else
