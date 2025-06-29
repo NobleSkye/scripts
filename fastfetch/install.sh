@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# ============================================================================
+# DISCLAIMER: This is a 3rd party installation script and has NO official
+# affiliation with FastFetch or its developers. This script is provided
+# "AS IS" without warranty. Use at your own discretion and risk.
+# ============================================================================
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -139,6 +145,28 @@ main() {
     echo "=========================================="
     echo "         FastFetch Installer"
     echo "=========================================="
+    echo
+    echo "⚠️  DISCLAIMER: This is a 3rd party installation script and has NO official"
+    echo "   affiliation with FastFetch or its developers. This script is provided"
+    echo "   'AS IS' without warranty. Use at your own discretion and risk!"
+    echo
+    print_warning "DISCLAIMER: This is a 3rd party script with NO official"
+    print_warning "affiliation to FastFetch. Use at your own discretion!"
+    echo
+    
+    # Countdown timer for disclaimer acknowledgment
+    echo "Press Ctrl+C to stop this script, Enter to continue immediately, or wait 10 seconds to proceed..."
+    for i in {10..1}; do
+        echo -ne "\rContinuing in ${i} seconds... (Press Enter to skip countdown)"
+        read -t 1 -n 1 key
+        if [[ $key == "" ]]; then
+            echo -e "\nProceeding with installation..."
+            break
+        fi
+    done
+    if [[ $i -eq 0 ]]; then
+        echo -e "\nProceeding with installation..."
+    fi
     echo
     print_status "This script will install FastFetch on your system."
     print_warning "Please ensure you have sudo privileges to run this script."
