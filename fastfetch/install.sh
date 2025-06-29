@@ -92,6 +92,19 @@ main() {
     
     # Install dependencies
     print_status "Installing build dependencies..."
+    
+    # Handle dpkg lock issue
+    print_status "Checking for dpkg lock..."
+    if lsof /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
+        print_warning "Another process is using the dpkg lock. Waiting for it to release..."
+        while lsof /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+            sleep 5
+        done
+        print_success "dpkg lock released. Proceeding with installation."
+    else
+        print_status "No dpkg lock detected. Proceeding with installation."
+    fi
+    
     if $USE_SUDO apt install git cmake gcc g++ libpci-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev -y; then
         print_success "Build dependencies installed successfully."
     else
