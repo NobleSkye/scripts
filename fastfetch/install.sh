@@ -92,13 +92,39 @@ check_existing_installation() {
 install_fastfetch() {
     print_status "Starting FastFetch installation process..."
     
-    # Update system
+    # Update system with better error handling
     print_status "Updating system packages..."
-    if sudo apt update && sudo apt upgrade -y; then
-        print_success "System updated successfully."
+    
+    # First attempt - normal update
+    if sudo apt update; then
+        print_status "Package list updated successfully."
     else
-        print_error "Failed to update system packages."
-        exit 1
+        print_warning "Standard apt update failed. Trying to fix repository issues..."
+        
+        # Try to fix repository issues
+        print_status "Attempting to fix repository configuration issues..."
+        sudo apt update --allow-releaseinfo-change 2>/dev/null || true
+        
+        # Try update again
+        if sudo apt update; then
+            print_status "Package list updated after fixing repository issues."
+        else
+            print_warning "Package update still has issues, but continuing with installation..."
+        fi
+    fi
+    
+    # Upgrade packages (make this optional to avoid the initial failure)
+    read -p "Do you want to upgrade existing packages? This may take a while (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        print_status "Upgrading system packages..."
+        if sudo apt upgrade -y; then
+            print_success "System upgraded successfully."
+        else
+            print_warning "System upgrade had issues, but continuing with FastFetch installation..."
+        fi
+    else
+        print_status "Skipping system upgrade."
     fi
     
     # Add PPA and install FastFetch
@@ -291,9 +317,6 @@ main() {
     
     # Verify installation
     verify_installation
-    
-    # Handle neofetch options
-    handle_neofetch_options
     
     echo
     print_success "FastFetch installation completed successfully!"
