@@ -30,6 +30,14 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Enhanced error handling and debugging output
+trap 'print_error "An unexpected error occurred. Exiting..."; exit 1' ERR
+
+# Debugging function
+print_debug() {
+    echo -e "${YELLOW}[DEBUG]${NC} $1"
+}
+
 # Function to check if running as root and set sudo usage
 check_root_and_sudo() {
     if [[ $EUID -eq 0 ]]; then
@@ -84,11 +92,25 @@ main() {
     
     # Install dependencies
     print_status "Installing build dependencies..."
-    if $USE_SUDO apt install git cmake gcc libpci-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev -y; then
+    if $USE_SUDO apt install git cmake gcc g++ libpci-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev -y; then
         print_success "Build dependencies installed successfully."
     else
         print_error "Failed to install build dependencies."
         exit 1
+    fi
+    
+    # Ensure C++ compiler is installed
+    print_status "Checking for C++ compiler..."
+    if ! command -v g++ >/dev/null 2>&1; then
+        print_warning "C++ compiler not found. Installing g++..."
+        if $USE_SUDO apt install g++ -y; then
+            print_success "C++ compiler installed successfully."
+        else
+            print_error "Failed to install C++ compiler. Please check your package manager or install it manually."
+            exit 1
+        fi
+    else
+        print_success "C++ compiler is already installed."
     fi
     
     # Clone FastFetch repository
@@ -97,39 +119,39 @@ main() {
     # Remove existing directory if it exists
     if [[ -d "fastfetch" ]]; then
         print_warning "Existing FastFetch directory found. Removing it..."
-        rm -rf fastfetch
+        rm -rf fastfetch || { print_error "Failed to remove existing FastFetch directory."; exit 1; }
     fi
     
     if git clone https://github.com/fastfetch-cli/fastfetch.git; then
         print_success "FastFetch repository cloned successfully."
     else
-        print_error "Failed to clone FastFetch repository."
+        print_error "Failed to clone FastFetch repository. Check your internet connection or Git configuration."
         exit 1
     fi
     
     # Build FastFetch
     print_status "Building FastFetch from source..."
-    cd fastfetch
+    cd fastfetch || { print_error "Failed to enter FastFetch directory."; exit 1; }
     if mkdir build && cd build && cmake .. && make -j$(nproc); then
         print_success "FastFetch built successfully."
     else
-        print_error "Failed to build FastFetch."
+        print_error "Failed to build FastFetch. Check the output above for errors and ensure all dependencies are installed."
         exit 1
     fi
-    
+
     # Install FastFetch
     print_status "Installing FastFetch..."
     if $USE_SUDO make install; then
         print_success "FastFetch installed successfully!"
     else
-        print_error "Failed to install FastFetch."
+        print_error "Failed to install FastFetch. Ensure you have sufficient permissions and check the output above for errors."
         exit 1
     fi
     
     # Cleanup
     print_status "Cleaning up build files..."
-    cd ../..
-    rm -rf fastfetch
+    cd ../.. || { print_error "Failed to return to the parent directory."; exit 1; }
+    rm -rf fastfetch || { print_error "Failed to clean up FastFetch directory."; exit 1; }
     print_success "Cleanup completed."
     
     echo
