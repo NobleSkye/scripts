@@ -36,22 +36,23 @@ command_exists() {
 }
 
 # Function to check if running as root
-check_not_root() {
+check_root_and_sudo() {
     if [[ $EUID -eq 0 ]]; then
-        print_error "This script should not be run as root directly. Use sudo when prompted."
-        exit 1
-    fi
-}
-
-# Function to check if sudo is available
-check_sudo() {
-    if ! command_exists sudo; then
-        print_error "sudo is required but not installed. Please install sudo first."
-        exit 1
-    fi
-    
-    if ! sudo -n true 2>/dev/null; then
-        print_warning "You will need to enter your password for sudo commands."
+        print_warning "Running as root user detected."
+        print_status "The script will run directly without sudo commands."
+        USE_SUDO=""
+    else
+        print_status "Running as regular user."
+        # Check if sudo is available
+        if ! command_exists sudo; then
+            print_error "sudo is required but not installed. Please install sudo first or run as root."
+            exit 1
+        fi
+        
+        if ! sudo -n true 2>/dev/null; then
+            print_warning "You will need to enter your password for sudo commands."
+        fi
+        USE_SUDO="sudo"
     fi
 }
 
@@ -138,21 +139,21 @@ handle_neofetch_removal() {
             print_status "Removing neofetch..."
             case $INSTALL_METHOD in
                 apt)
-                    if sudo apt remove neofetch -y && sudo apt autoremove -y; then
+                    if $USE_SUDO apt remove neofetch -y && $USE_SUDO apt autoremove -y; then
                         print_success "Neofetch removed successfully!"
                     else
                         print_warning "Failed to remove neofetch, but continuing with installation."
                     fi
                     ;;
                 dnf)
-                    if sudo dnf remove neofetch -y; then
+                    if $USE_SUDO dnf remove neofetch -y; then
                         print_success "Neofetch removed successfully!"
                     else
                         print_warning "Failed to remove neofetch, but continuing with installation."
                     fi
                     ;;
                 pacman)
-                    if sudo pacman -R neofetch --noconfirm; then
+                    if $USE_SUDO pacman -R neofetch --noconfirm; then
                         print_success "Neofetch removed successfully!"
                     else
                         print_warning "Failed to remove neofetch, but continuing with installation."
@@ -227,7 +228,7 @@ create_neofetch_alias() {
     read -p "Do you want to create a system-wide neofetch command? (y/N): " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        if sudo ln -sf "$(which fastfetch)" /usr/local/bin/neofetch 2>/dev/null; then
+        if $USE_SUDO ln -sf "$(which fastfetch)" /usr/local/bin/neofetch 2>/dev/null; then
             print_success "System-wide neofetch command created!"
         else
             print_warning "Failed to create system-wide neofetch command, but shell alias was created."
@@ -255,18 +256,35 @@ install_fastfetch() {
     
     case $INSTALL_METHOD in
         apt)
-            # Update system
-            print_status "Updating system packages..."
-            if sudo apt update && sudo apt upgrade -y; then
-                print_success "System updated successfully."
+            # Check if we can update system packages
+            print_status "Checking system update permissions..."
+            
+            # Test if we can run apt update
+            if $USE_SUDO apt list --upgradable >/dev/null 2>&1; then
+                print_success "System update permissions verified."
+                echo
+                read -p "Do you want to update system packages before installing FastFetch? (Y/n): " -n 1 -r
+                echo
+                if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+                    print_status "Updating system packages..."
+                    if $USE_SUDO apt update && $USE_SUDO apt upgrade -y; then
+                        print_success "System updated successfully."
+                    else
+                        print_warning "System update failed, but continuing with FastFetch installation..."
+                    fi
+                else
+                    print_status "Skipping system update."
+                fi
             else
-                print_error "Failed to update system packages."
-                exit 1
+                print_warning "Cannot update system packages due to insufficient permissions or repository issues."
+                print_status "Continuing with FastFetch installation without system update..."
             fi
+            
+            echo
             
             # Add FastFetch PPA
             print_status "Adding FastFetch PPA repository..."
-            if sudo add-apt-repository ppa:fastfetch/stable -y; then
+            if $USE_SUDO add-apt-repository ppa:fastfetch/stable -y; then
                 print_success "FastFetch PPA added successfully."
             else
                 print_error "Failed to add FastFetch PPA."
@@ -275,7 +293,7 @@ install_fastfetch() {
             
             # Update package list
             print_status "Updating package list..."
-            if sudo apt update; then
+            if $USE_SUDO apt update; then
                 print_success "Package list updated successfully."
             else
                 print_error "Failed to update package list."
@@ -284,7 +302,7 @@ install_fastfetch() {
             
             # Install FastFetch
             print_status "Installing FastFetch..."
-            if sudo apt install fastfetch -y; then
+            if $USE_SUDO apt install fastfetch -y; then
                 print_success "FastFetch installed successfully!"
             else
                 print_error "Failed to install FastFetch."
@@ -331,8 +349,7 @@ main() {
     echo
     
     # Pre-installation checks
-    check_not_root
-    check_sudo
+    check_root_and_sudo
     detect_os
     
     echo
